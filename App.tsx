@@ -238,7 +238,7 @@ const App: React.FC = () => {
                 })}
 
                 <div className="pt-12">
-                  <button 
+                  <button
                     onClick={saveToCloud}
                     disabled={valuePoints.length === 0 || isSyncing}
                     className="group relative w-full py-8 bg-black text-white rounded-full text-xs uppercase tracking-[0.6em] disabled:opacity-20 transition-all hover:bg-[#002395] shadow-2xl overflow-hidden"
@@ -254,6 +254,7 @@ const App: React.FC = () => {
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                   </button>
                 </div>
+              </div>
               </div>
             </motion.div>
           )}
