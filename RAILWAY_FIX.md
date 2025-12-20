@@ -137,8 +137,36 @@ npm run preview -- --port $PORT --host 0.0.0.0
 - `--port $PORT` - Railway injects actual port number (e.g., 8080)
 - `--host 0.0.0.0` - Binds to all network interfaces
 
+## Additional Issue: npm ci Cache Conflict
+
+### Problem
+After the initial fix, deployment failed with:
+```
+npm error code EBUSY
+npm error syscall rmdir
+npm error path /app/node_modules/.cache
+npm error errno -16
+npm error EBUSY: resource busy or locked, rmdir '/app/node_modules/.cache'
+```
+
+### Root Cause
+The `buildCommand` was running `npm ci` when Nixpacks already runs `npm ci` in its install phase. This caused a conflict with Railway's cache mount on `/app/node_modules/.cache`.
+
+### Solution
+Changed `railway.json` buildCommand from:
+```json
+"buildCommand": "npm ci && npm run build"
+```
+
+To:
+```json
+"buildCommand": "npm run build"
+```
+
+Nixpacks handles the install phase automatically, so the buildCommand should only run the actual build step.
+
 ## Status
 
-✅ **FIXED** - Deployed in commit `0bbc6c0`
+✅ **FIXED** - Initial fix in commit `0bbc6c0`, cache fix in commit `86719cf`
 
 The app should now deploy successfully to Railway!
