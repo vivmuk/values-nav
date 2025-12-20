@@ -22,6 +22,8 @@ const App: React.FC = () => {
     [Domain.PERSONAL_GROWTH_HEALTH]: '',
     [Domain.LEISURE]: '',
   });
+  // For score selection popup
+  const [pendingValue, setPendingValue] = useState<{ domain: Domain; label: string } | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -42,48 +44,48 @@ const App: React.FC = () => {
     }
   }, [view, entries]);
 
-  const toggleValue = (domain: Domain, value: string) => {
-    setValuePoints(prev => {
-      const exists = prev.find(p => p.label === value && p.domain === domain);
-      if (exists) return prev.filter(p => p.id !== exists.id);
-      return [...prev, { id: Math.random().toString(36).substr(2, 9), label: value, domain, score: 3 }];
-    });
+  // When clicking a value, either remove it or show score selector
+  const handleValueClick = (domain: Domain, label: string) => {
+    const exists = valuePoints.find(p => p.label === label && p.domain === domain);
+    if (exists) {
+      // Remove it
+      setValuePoints(prev => prev.filter(p => p.id !== exists.id));
+    } else {
+      // Show score selector
+      setPendingValue({ domain, label });
+    }
+  };
+
+  // Add value with selected score
+  const addValueWithScore = (score: number) => {
+    if (!pendingValue) return;
+    setValuePoints(prev => [
+      ...prev,
+      { id: Math.random().toString(36).substr(2, 9), label: pendingValue.label, domain: pendingValue.domain, score }
+    ]);
+    setPendingValue(null);
   };
 
   const handleCustomAdd = (domain: Domain) => {
     if (!customInputs[domain]) return;
-    const value = customInputs[domain];
-    setValuePoints(prev => [
-      ...prev, 
-      { id: Math.random().toString(36).substr(2, 9), label: value, domain, score: 3 }
-    ]);
+    const label = customInputs[domain];
+    setPendingValue({ domain, label });
     setCustomInputs(prev => ({ ...prev, [domain]: '' }));
   };
 
-  const handlePositionChange = (id: string, score: number) => {
-    // Round to integer for cleaner display
-    const roundedScore = Math.round(score);
-    setValuePoints(prev => prev.map(p => p.id === id ? { ...p, score: roundedScore } : p));
-  };
-
-  // Convert score (0-10) to layer (1-5, where 1 = center, 5 = edge)
+  // Score IS the layer now (1-5, where 5=center/best, 1=outer/worst)
   const scoreToLayer = (score: number): number => {
-    const roundedScore = Math.round(score);
-    if (roundedScore >= 9) return 1; // Center (Layer 1)
-    if (roundedScore >= 7) return 2; // Layer 2
-    if (roundedScore >= 5) return 3; // Layer 3
-    if (roundedScore >= 3) return 4; // Layer 4
-    return 5; // Edge (Layer 5)
+    return Math.round(score);
   };
 
   const saveToCloud = async () => {
     if (valuePoints.length === 0) return;
     setIsSyncing(true);
-    // Convert scores to integers and add layer numbers before saving
+    // Score is already the layer (1-5)
     const valuePointsWithLayers = valuePoints.map(vp => ({
       ...vp,
-      score: Math.round(vp.score), // Round to integer
-      layer: scoreToLayer(vp.score) // Add layer number (1-5)
+      score: vp.score,
+      layer: vp.score // Score IS the layer
     }));
     const newEntry: Entry = {
       id: Date.now().toString(),
@@ -93,13 +95,14 @@ const App: React.FC = () => {
     await cloudService.syncEntry(newEntry);
     const updatedHistory = await cloudService.getHistory();
     setEntries(updatedHistory);
+    setLastEntry(updatedHistory[0]);
+    setValuePoints([]);
     setIsSyncing(false);
     setView('history');
   };
 
   const handleDeleteEntry = async (entryId: string) => {
-    if (deleteCode !== 'DELETE') {
-      alert('Please enter DELETE to confirm');
+    if (deleteCode !== '1983') {
       return;
     }
     await cloudService.deleteEntry(entryId);
@@ -171,24 +174,64 @@ const App: React.FC = () => {
           )}
 
           {view === 'assess' && (
-            <motion.div 
+            <motion.div
               key="assess"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="space-y-16"
             >
+              {/* Score Selection Popup */}
+              {pendingValue && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setPendingValue(null)}>
+                  <div className="bg-white rounded-3xl p-8 max-w-md mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                    <h3 className="serif text-2xl italic mb-2 text-center">Rate Your Alignment</h3>
+                    <p className="text-center text-gray-500 text-sm mb-6">"{pendingValue.label}"</p>
+                    <p className="text-center text-xs text-gray-400 mb-4">How well are you living this value?</p>
+                    <div className="flex justify-center gap-3 mb-6">
+                      {[1, 2, 3, 4, 5].map(score => (
+                        <button
+                          key={score}
+                          onClick={() => addValueWithScore(score)}
+                          className={`w-14 h-14 rounded-full text-lg font-bold transition-all hover:scale-110 ${
+                            score === 5 ? 'bg-[#002395] text-white' :
+                            score === 4 ? 'bg-[#002395]/70 text-white' :
+                            score === 3 ? 'bg-gray-300 text-gray-700' :
+                            score === 2 ? 'bg-[#ED2939]/70 text-white' :
+                            'bg-[#ED2939] text-white'
+                          }`}
+                        >
+                          {score}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex justify-between text-[10px] uppercase tracking-widest text-gray-400 px-2">
+                      <span>Off Course</span>
+                      <span>On Target</span>
+                    </div>
+                    <button
+                      onClick={() => setPendingValue(null)}
+                      className="w-full mt-6 py-2 text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-32 items-start">
               {/* Left Column: Visual Mapping */}
               <div className="lg:sticky lg:top-12 space-y-12">
                 <div className="bg-white p-16 rounded-[4rem] shadow-[0_40px_100px_-40px_rgba(0,0,0,0.1)] border border-white">
-                  <BullseyeChart valuePoints={valuePoints} onPositionChange={handlePositionChange} />
+                  <BullseyeChart valuePoints={valuePoints} />
                 </div>
                 <div className="bg-white/50 p-8 rounded-3xl border border-white backdrop-blur-md">
                    <h5 className="text-[10px] uppercase tracking-[0.3em] font-bold mb-4 flex items-center gap-2">
                      <span className="w-2 h-2 rounded-full bg-[#002395]"></span>
-                     Dynamic Interaction
+                     Scoring Guide
                    </h5>
-                   <p className="text-xs text-gray-500 font-light leading-relaxed italic">
-                     "The goal is not perfection, but direction. If your markers are on the edge, ask yourself what internal barriers are preventing you from moving toward the center."
+                   <p className="text-xs text-gray-500 font-light leading-relaxed">
+                     <span className="font-bold text-[#002395]">5</span> = Fully aligned, living this value completely<br/>
+                     <span className="font-bold">3</span> = Partially aligned, room for improvement<br/>
+                     <span className="font-bold text-[#ED2939]">1</span> = Off course, not living this value
                    </p>
                 </div>
               </div>
@@ -197,12 +240,13 @@ const App: React.FC = () => {
               <div className="space-y-20">
                 <div className="border-b border-gray-100 pb-12">
                   <h2 className="serif text-5xl mb-4 italic">Defining Intentions</h2>
-                  <p className="text-gray-400 text-xs uppercase tracking-[0.4em] font-medium">Select or create the values that define your path</p>
+                  <p className="text-gray-400 text-xs uppercase tracking-[0.4em] font-medium">Select values and rate your alignment</p>
                 </div>
 
                 {(Object.keys(Domain) as (keyof typeof Domain)[]).map(key => {
                   const domain = Domain[key];
                   const meta = DOMAIN_METADATA[domain];
+                  const domainValues = valuePoints.filter(p => p.domain === domain);
                   return (
                     <div key={domain} className="group space-y-8">
                       <div className="flex items-center justify-between">
@@ -210,19 +254,37 @@ const App: React.FC = () => {
                           <span className="p-3 bg-white rounded-full shadow-sm text-black" style={{ color: meta.color }}>{meta.icon}</span>
                           <h4 className="text-xs font-bold uppercase tracking-[0.2em]">{domain}</h4>
                         </div>
-                        <span className="text-[10px] text-gray-300 font-medium italic">{valuePoints.filter(p => p.domain === domain).length} selected</span>
+                        <span className="text-[10px] text-gray-300 font-medium italic">{domainValues.length} selected</span>
                       </div>
 
+                      {/* Selected values with scores */}
+                      {domainValues.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {domainValues.map(vp => (
+                            <button
+                              key={vp.id}
+                              onClick={() => handleValueClick(domain, vp.label)}
+                              className={`px-4 py-2 rounded-full text-[10px] uppercase tracking-widest border transition-all duration-300 flex items-center gap-2 ${
+                                vp.score === 5 ? 'bg-[#002395] text-white border-[#002395]' :
+                                vp.score === 4 ? 'bg-[#002395]/70 text-white border-[#002395]/70' :
+                                vp.score === 3 ? 'bg-gray-300 text-gray-700 border-gray-300' :
+                                vp.score === 2 ? 'bg-[#ED2939]/70 text-white border-[#ED2939]/70' :
+                                'bg-[#ED2939] text-white border-[#ED2939]'
+                              }`}
+                            >
+                              {vp.label}
+                              <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px]">{vp.score}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="flex flex-wrap gap-2.5">
-                        {PREDEFINED_VALUES[domain].map(val => (
+                        {PREDEFINED_VALUES[domain].filter(val => !valuePoints.some(p => p.label === val && p.domain === domain)).map(val => (
                           <button
                             key={val}
-                            onClick={() => toggleValue(domain, val)}
-                            className={`px-5 py-2.5 rounded-full text-[10px] uppercase tracking-widest border transition-all duration-300 ${
-                              valuePoints.some(p => p.label === val) 
-                                ? 'bg-[#002395] text-white border-[#002395] shadow-lg scale-105' 
-                                : 'bg-white text-gray-400 border-gray-100 hover:border-black'
-                            }`}
+                            onClick={() => handleValueClick(domain, val)}
+                            className="px-5 py-2.5 rounded-full text-[10px] uppercase tracking-widest border transition-all duration-300 bg-white text-gray-400 border-gray-100 hover:border-black"
                           >
                             {val}
                           </button>
@@ -230,15 +292,15 @@ const App: React.FC = () => {
                       </div>
 
                       <div className="relative">
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           value={customInputs[domain]}
                           onChange={(e) => setCustomInputs(prev => ({ ...prev, [domain]: e.target.value }))}
                           placeholder="Manually enter a custom value..."
                           className="w-full bg-transparent border-b border-gray-200 py-3 text-xs focus:border-[#002395] focus:outline-none placeholder:italic transition-colors"
                           onKeyDown={(e) => e.key === 'Enter' && handleCustomAdd(domain)}
                         />
-                        <button 
+                        <button
                           onClick={() => handleCustomAdd(domain)}
                           className="absolute right-0 top-1/2 -translate-y-1/2 text-[10px] uppercase font-bold tracking-widest text-[#002395] opacity-50 hover:opacity-100 transition-opacity"
                         >
@@ -290,7 +352,7 @@ const App: React.FC = () => {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
                     {/* Bullseye Chart showing last session values */}
                     <div className="bg-white p-12 rounded-[3rem] shadow-[0_40px_100px_-40px_rgba(0,0,0,0.1)] border border-white">
-                      <BullseyeChart valuePoints={lastEntry.valuePoints} onPositionChange={() => {}} />
+                      <BullseyeChart valuePoints={lastEntry.valuePoints} />
                     </div>
 
                     {/* Collapsible Quadrants */}
@@ -317,29 +379,28 @@ const App: React.FC = () => {
                   </div>
                 ) : (
                   entries.map(entry => {
-                    // Calculate summary statistics
-                    const layerCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                    // Calculate summary statistics - score IS the value (1-5)
+                    const scoreCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
                     const domainCounts: Record<Domain, number> = {
                       [Domain.WORK_EDUCATION]: 0,
                       [Domain.RELATIONSHIPS]: 0,
                       [Domain.PERSONAL_GROWTH_HEALTH]: 0,
                       [Domain.LEISURE]: 0
                     };
-                    
+
                     entry.valuePoints.forEach(p => {
-                      const layer = (p as any).layer || scoreToLayer(p.score);
-                      layerCounts[layer] = (layerCounts[layer] || 0) + 1;
+                      scoreCounts[p.score] = (scoreCounts[p.score] || 0) + 1;
                       domainCounts[p.domain] = (domainCounts[p.domain] || 0) + 1;
                     });
 
                     return (
-                      <motion.div 
+                      <motion.div
                         layout
-                        key={entry.id} 
+                        key={entry.id}
                         className="bg-white p-12 rounded-[3rem] border border-white shadow-sm hover:shadow-2xl transition-all duration-500 relative overflow-hidden group"
                       >
                         <div className="absolute top-0 left-0 w-1 h-full bg-[#002395] opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        
+
                         {/* Header */}
                         <div className="flex justify-between items-center mb-8 border-b border-gray-50 pb-6">
                           <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-gray-300">
@@ -350,24 +411,24 @@ const App: React.FC = () => {
                           </span>
                         </div>
 
-                        {/* Summary by Layer */}
+                        {/* Summary by Score */}
                         <div className="mb-8 space-y-3">
-                          <h4 className="text-[9px] uppercase tracking-[0.3em] font-bold text-gray-400 mb-4">Bullseye Summary</h4>
+                          <h4 className="text-[9px] uppercase tracking-[0.3em] font-bold text-gray-400 mb-4">Score Distribution</h4>
                           <div className="grid grid-cols-5 gap-2">
-                            {[1, 2, 3, 4, 5].map(layer => (
-                              <div key={layer} className="text-center">
-                                <div className={`text-lg font-bold ${layer === 1 ? 'text-[#002395]' : layer === 5 ? 'text-[#ED2939]' : 'text-gray-600'}`}>
-                                  {layerCounts[layer] || 0}
+                            {[5, 4, 3, 2, 1].map(score => (
+                              <div key={score} className="text-center">
+                                <div className={`text-lg font-bold ${score >= 4 ? 'text-[#002395]' : score <= 2 ? 'text-[#ED2939]' : 'text-gray-600'}`}>
+                                  {scoreCounts[score] || 0}
                                 </div>
                                 <div className="text-[8px] uppercase tracking-[0.1em] text-gray-400 mt-1">
-                                  L{layer}
+                                  {score}
                                 </div>
                               </div>
                             ))}
                           </div>
                           <div className="flex justify-between text-[8px] text-gray-400 mt-4 pt-4 border-t border-gray-50">
-                            <span>Center</span>
-                            <span>Edge</span>
+                            <span>On Target</span>
+                            <span>Off Course</span>
                           </div>
                         </div>
 
@@ -392,20 +453,20 @@ const App: React.FC = () => {
                           <h4 className="text-[9px] uppercase tracking-[0.3em] font-bold text-gray-400 mb-3">Values</h4>
                           <div className="space-y-3 max-h-48 overflow-y-auto">
                             {entry.valuePoints.map(p => {
-                              const layer = (p as any).layer || scoreToLayer(p.score);
-                              const score = Math.round(p.score);
+                              const score = p.score;
                               return (
-                                <div key={p.id} className="space-y-1">
-                                  <div className="flex justify-between items-center text-[9px] uppercase tracking-[0.15em] font-semibold">
-                                    <span className="text-gray-400">{p.domain.split(' ')[0]}</span>
-                                    <div className="flex items-center gap-2">
-                                      <span className={`px-2 py-0.5 rounded ${layer === 1 ? 'bg-[#002395]/10 text-[#002395]' : layer === 5 ? 'bg-[#ED2939]/10 text-[#ED2939]' : 'bg-gray-100 text-gray-600'}`}>
-                                        Layer {layer}
-                                      </span>
-                                      <span className="text-gray-600">{score}/10</span>
-                                    </div>
+                                <div key={p.id} className="flex justify-between items-center py-1">
+                                  <div className="flex-1">
+                                    <p className="text-xs text-gray-700">{p.label}</p>
+                                    <span className="text-[9px] text-gray-400">{p.domain.split(' ')[0]}</span>
                                   </div>
-                                  <p className="text-xs italic font-light text-gray-700">"{p.label}"</p>
+                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                                    score >= 4 ? 'bg-[#002395]/10 text-[#002395]' :
+                                    score <= 2 ? 'bg-[#ED2939]/10 text-[#ED2939]' :
+                                    'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {score}/5
+                                  </span>
                                 </div>
                               );
                             })}

@@ -10,23 +10,35 @@ interface LastSessionSummaryProps {
 interface QuadrantSectionProps {
   domain: Domain;
   values: ValuePoint[];
-  scoreToLayer: (score: number) => number;
   isExpanded: boolean;
   onToggle: () => void;
 }
 
-const QuadrantSection: React.FC<QuadrantSectionProps> = ({ domain, values, scoreToLayer, isExpanded, onToggle }) => {
+const QuadrantSection: React.FC<QuadrantSectionProps> = ({ domain, values, isExpanded, onToggle }) => {
   const meta = DOMAIN_METADATA[domain];
 
-  // Calculate stats for this quadrant
-  const inTarget = values.filter(v => {
-    const layer = (v as any).layer || scoreToLayer(v.score);
-    return layer <= 2;
-  }).length;
-
+  // Score 4-5 = in target (good)
+  const inTarget = values.filter(v => v.score >= 4).length;
   const avgScore = values.length > 0
     ? Math.round(values.reduce((sum, v) => sum + v.score, 0) / values.length * 10) / 10
     : 0;
+
+  // Get color based on score (5=best blue, 1=worst red)
+  const getScoreColor = (score: number) => {
+    if (score === 5) return { bg: 'bg-[#002395]/10', text: 'text-[#002395]' };
+    if (score === 4) return { bg: 'bg-[#002395]/5', text: 'text-[#002395]/80' };
+    if (score === 3) return { bg: 'bg-gray-100', text: 'text-gray-600' };
+    if (score === 2) return { bg: 'bg-[#ED2939]/5', text: 'text-[#ED2939]/80' };
+    return { bg: 'bg-[#ED2939]/10', text: 'text-[#ED2939]' };
+  };
+
+  const getDotColor = (score: number) => {
+    if (score === 5) return 'bg-[#002395]';
+    if (score === 4) return 'bg-[#002395]/60';
+    if (score === 3) return 'bg-gray-400';
+    if (score === 2) return 'bg-[#ED2939]/60';
+    return 'bg-[#ED2939]';
+  };
 
   return (
     <div className="border border-gray-100 rounded-2xl overflow-hidden bg-white/80">
@@ -44,27 +56,15 @@ const QuadrantSection: React.FC<QuadrantSectionProps> = ({ domain, values, score
           <div className="text-left">
             <h4 className="text-xs font-bold uppercase tracking-[0.15em]">{domain}</h4>
             <p className="text-[10px] text-gray-400">
-              {values.length} value{values.length !== 1 ? 's' : ''} • {inTarget} in target • Avg: {avgScore}/10
+              {values.length} value{values.length !== 1 ? 's' : ''} • {inTarget} on target • Avg: {avgScore}/5
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex gap-1">
-            {values.slice(0, 3).map((v, i) => {
-              const layer = (v as any).layer || scoreToLayer(v.score);
-              return (
-                <span
-                  key={i}
-                  className={`w-2 h-2 rounded-full ${
-                    layer === 1 ? 'bg-[#002395]' :
-                    layer === 2 ? 'bg-[#002395]/60' :
-                    layer === 3 ? 'bg-gray-400' :
-                    layer === 4 ? 'bg-[#ED2939]/60' :
-                    'bg-[#ED2939]'
-                  }`}
-                />
-              );
-            })}
+            {values.slice(0, 3).map((v, i) => (
+              <span key={i} className={`w-2 h-2 rounded-full ${getDotColor(v.score)}`} />
+            ))}
             {values.length > 3 && (
               <span className="text-[9px] text-gray-400 ml-1">+{values.length - 3}</span>
             )}
@@ -87,8 +87,7 @@ const QuadrantSection: React.FC<QuadrantSectionProps> = ({ domain, values, score
       >
         <div className="px-6 pb-4 space-y-2 border-t border-gray-50">
           {values.map(v => {
-            const layer = (v as any).layer || scoreToLayer(v.score);
-            const score = Math.round(v.score);
+            const colors = getScoreColor(v.score);
             return (
               <div
                 key={v.id}
@@ -96,18 +95,9 @@ const QuadrantSection: React.FC<QuadrantSectionProps> = ({ domain, values, score
               >
                 <span className="text-sm text-gray-700">{v.label}</span>
                 <div className="flex items-center gap-3">
-                  <span
-                    className={`px-2 py-0.5 rounded text-[9px] uppercase tracking-wide font-bold ${
-                      layer === 1 ? 'bg-[#002395]/10 text-[#002395]' :
-                      layer === 2 ? 'bg-[#002395]/5 text-[#002395]/80' :
-                      layer === 3 ? 'bg-gray-100 text-gray-600' :
-                      layer === 4 ? 'bg-[#ED2939]/5 text-[#ED2939]/80' :
-                      'bg-[#ED2939]/10 text-[#ED2939]'
-                    }`}
-                  >
-                    Layer {layer}
+                  <span className={`px-2 py-0.5 rounded text-[9px] uppercase tracking-wide font-bold ${colors.bg} ${colors.text}`}>
+                    {v.score}/5
                   </span>
-                  <span className="text-xs font-medium text-gray-500 w-10 text-right">{score}/10</span>
                 </div>
               </div>
             );
@@ -121,7 +111,7 @@ const QuadrantSection: React.FC<QuadrantSectionProps> = ({ domain, values, score
   );
 };
 
-const LastSessionSummary: React.FC<LastSessionSummaryProps> = ({ lastEntry, scoreToLayer }) => {
+const LastSessionSummary: React.FC<LastSessionSummaryProps> = ({ lastEntry }) => {
   const [expandedQuadrants, setExpandedQuadrants] = useState<Record<Domain, boolean>>({
     [Domain.WORK_EDUCATION]: true,
     [Domain.RELATIONSHIPS]: true,
@@ -148,12 +138,9 @@ const LastSessionSummary: React.FC<LastSessionSummaryProps> = ({ lastEntry, scor
     valuesByDomain[v.domain].push(v);
   });
 
-  // Calculate overall stats
+  // Calculate overall stats (score 4-5 = on target)
   const totalValues = lastEntry.valuePoints.length;
-  const totalInTarget = lastEntry.valuePoints.filter(v => {
-    const layer = (v as any).layer || scoreToLayer(v.score);
-    return layer <= 2;
-  }).length;
+  const totalOnTarget = lastEntry.valuePoints.filter(v => v.score >= 4).length;
 
   return (
     <div className="bg-white/50 backdrop-blur-md p-8 rounded-3xl border border-gray-100">
@@ -161,7 +148,7 @@ const LastSessionSummary: React.FC<LastSessionSummaryProps> = ({ lastEntry, scor
         <div>
           <h3 className="serif text-2xl italic">Last Session</h3>
           <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400 mt-1">
-            {totalValues} values • {totalInTarget} in target (Layer 1-2)
+            {totalValues} values • {totalOnTarget} on target (4-5)
           </p>
         </div>
         <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-gray-400">
@@ -180,7 +167,6 @@ const LastSessionSummary: React.FC<LastSessionSummaryProps> = ({ lastEntry, scor
               key={domain}
               domain={domain}
               values={values}
-              scoreToLayer={scoreToLayer}
               isExpanded={expandedQuadrants[domain]}
               onToggle={() => toggleQuadrant(domain)}
             />
@@ -188,25 +174,26 @@ const LastSessionSummary: React.FC<LastSessionSummaryProps> = ({ lastEntry, scor
         })}
       </div>
 
-      {/* Quick Summary Bar */}
+      {/* Quick Summary Bar - Score distribution */}
       <div className="mt-6 pt-6 border-t border-gray-100">
         <div className="grid grid-cols-5 gap-4">
-          {[1, 2, 3, 4, 5].map(layer => {
-            const count = lastEntry.valuePoints.filter(p => {
-              const entryLayer = (p as any).layer || scoreToLayer(p.score);
-              return entryLayer === layer;
-            }).length;
+          {[5, 4, 3, 2, 1].map(score => {
+            const count = lastEntry.valuePoints.filter(p => p.score === score).length;
             return (
-              <div key={layer} className="text-center">
-                <div className={`text-xl font-bold ${layer === 1 ? 'text-[#002395]' : layer === 5 ? 'text-[#ED2939]' : 'text-gray-600'}`}>
+              <div key={score} className="text-center">
+                <div className={`text-xl font-bold ${score >= 4 ? 'text-[#002395]' : score <= 2 ? 'text-[#ED2939]' : 'text-gray-600'}`}>
                   {count}
                 </div>
                 <div className="text-[9px] uppercase tracking-[0.1em] text-gray-400 mt-1">
-                  Layer {layer}
+                  Score {score}
                 </div>
               </div>
             );
           })}
+        </div>
+        <div className="flex justify-between text-[8px] text-gray-400 mt-3 px-2">
+          <span>On Target</span>
+          <span>Off Course</span>
         </div>
       </div>
     </div>
