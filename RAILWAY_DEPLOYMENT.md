@@ -92,11 +92,14 @@ Railway should automatically detect the build settings from `railway.json`:
 
 - **Build Command**: `npm install && npm run build`
 - **Start Command**: `npm run preview`
+- **Node Version**: 20 (from `.nvmrc` / `package.json#engines`)
 
 If you need to verify or change these:
 1. Go to **"Settings"** tab
 2. Scroll to **"Deploy"** section
 3. Check **Build Command** and **Start Command**
+
+If Railway still builds with Node 18, set a Railway variable: `NIXPACKS_NODE_VERSION=20` and redeploy.
 
 ---
 
@@ -150,6 +153,7 @@ If you need to verify or change these:
 ### "Application failed to respond" error
 - Check Railway logs for errors
 - Ensure the start command is correct: `npm run preview`
+- Ensure the app listens on Railway's `$PORT` (this repo configures Vite preview to bind to `$PORT` and `0.0.0.0`)
 - Verify the app runs locally first with `npm run build && npm run preview`
 
 ### Changes not deploying

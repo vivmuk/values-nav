@@ -4,9 +4,14 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    const railwayPort = Number(process.env.PORT);
     return {
       server: {
         port: 3000,
+        host: '0.0.0.0',
+      },
+      preview: {
+        port: Number.isFinite(railwayPort) ? railwayPort : 3000,
         host: '0.0.0.0',
       },
       plugins: [react()],
