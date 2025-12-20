@@ -159,11 +159,6 @@ const App: React.FC = () => {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="space-y-16"
             >
-              {/* Show Last Session Summary with Collapsible Quadrants */}
-              {lastEntry && (
-                <LastSessionSummary lastEntry={lastEntry} scoreToLayer={scoreToLayer} />
-              )}
-
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-32 items-start">
               {/* Left Column: Visual Mapping */}
               <div className="lg:sticky lg:top-12 space-y-12">
@@ -260,11 +255,34 @@ const App: React.FC = () => {
           )}
 
           {view === 'history' && (
-            <motion.div 
+            <motion.div
               key="history"
               initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-              className="space-y-32"
+              className="space-y-16"
             >
+              {/* Last Session with Bullseye and Collapsible Quadrants */}
+              {lastEntry && (
+                <section className="space-y-8">
+                  <div className="text-center space-y-4">
+                    <h2 className="serif text-7xl italic">Last Session</h2>
+                    <p className="text-gray-400 text-xs uppercase tracking-[0.5em]">
+                      {new Date(lastEntry.timestamp).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+                    {/* Bullseye Chart showing last session values */}
+                    <div className="bg-white p-12 rounded-[3rem] shadow-[0_40px_100px_-40px_rgba(0,0,0,0.1)] border border-white">
+                      <BullseyeChart valuePoints={lastEntry.valuePoints} onPositionChange={() => {}} />
+                    </div>
+
+                    {/* Collapsible Quadrants */}
+                    <LastSessionSummary lastEntry={lastEntry} scoreToLayer={scoreToLayer} />
+                  </div>
+                </section>
+              )}
+
+              {/* Timeline Chart */}
               <section className="text-center max-w-5xl mx-auto space-y-16">
                 <div className="space-y-4">
                   <h2 className="serif text-7xl italic">The Timeline</h2>
