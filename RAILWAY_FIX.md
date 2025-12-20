@@ -13,28 +13,25 @@ The app built successfully but failed to respond to health checks.
 
 ## Root Cause
 
-Vite's preview server wasn't binding to Railway's dynamically assigned `$PORT` environment variable on the correct host (`0.0.0.0`).
+The service never became healthy because the start command was launching Vite incorrectly. In some environments, `npm run preview -- --port $PORT --host 0.0.0.0` is parsed by `npm` as npm CLI options (not script args), so Vite receives positional args like `vite preview 8080 0.0.0.0`, treats them as the project root, and exits with “dist does not exist”.
 
 ## Solution Applied
 
 ### 1. Updated `railway.json`
 
-Changed the start command to explicitly pass PORT and host:
+Changed the start command to just run the preview script (port/host are handled by `vite.config.ts`):
 
 ```json
 {
   "deploy": {
-    "startCommand": "npm run preview -- --port $PORT --host 0.0.0.0",
+    "startCommand": "npm run preview",
     "healthcheckTimeout": 300
   }
 }
 ```
 
 **Changes:**
-- Explicitly pass `--port $PORT` to use Railway's assigned port
-- Explicitly pass `--host 0.0.0.0` to bind to all interfaces
 - Increased healthcheck timeout from 100s to 300s for initial startup
-- Changed `npm install` to `npm ci` for faster, more reliable builds
 
 ### 2. Updated `vite.config.ts`
 
@@ -110,7 +107,7 @@ GEMINI_API_KEY=your_gemini_api_key (optional for AI features)
 ### If Issues Persist
 
 1. **Check Railway logs** for startup errors
-2. **Verify PORT is being used**: Look for log line like `preview server started at http://0.0.0.0:XXXX`
+2. **Verify PORT is being used**: Look for log lines like `Local: http://localhost:XXXX` and `Network: http://...:XXXX`
 3. **Test locally** with Railway's PORT simulation:
    ```bash
    PORT=8080 npm run build && PORT=8080 npm run preview
@@ -125,17 +122,6 @@ GEMINI_API_KEY=your_gemini_api_key (optional for AI features)
 - Apps must bind to `0.0.0.0` (not `localhost` or `127.0.0.1`) for Railway's load balancer
 - Vite's preview server defaults to port 4173, but Railway needs dynamic port
 - Health checks verify the service is responding before routing traffic
-
-### Command Breakdown
-
-```bash
-npm run preview -- --port $PORT --host 0.0.0.0
-```
-
-- `npm run preview` - Runs Vite's preview server
-- `--` - Passes remaining args to the underlying command
-- `--port $PORT` - Railway injects actual port number (e.g., 8080)
-- `--host 0.0.0.0` - Binds to all network interfaces
 
 ## Additional Issue: npm ci Cache Conflict
 
@@ -167,6 +153,6 @@ Nixpacks handles the install phase automatically, so the buildCommand should onl
 
 ## Status
 
-✅ **FIXED** - Initial fix in commit `0bbc6c0`, cache fix in commit `86719cf`
+✅ **FIXED** - Ensure Railway starts with `npm run preview` and relies on `vite.config.ts` for `PORT`/`host` binding.
 
 The app should now deploy successfully to Railway!
