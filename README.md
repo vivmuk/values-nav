@@ -57,13 +57,32 @@ This will show you how to:
 - Connect your app to Firebase
 
 ### 🚂 Deploy to Railway
-Follow the deployment guide: **[RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md)**
 
-This will show you how to:
-- Deploy your app to Railway
-- Configure environment variables
-- Get a public URL
-- Monitor your deployment
+1. **Push your code to a Git repository** (GitHub, GitLab, etc.)
+
+2. **Connect to Railway:**
+   - Go to [Railway](https://railway.app)
+   - Create a new project
+   - Connect your repository
+
+3. **Pin Nixpacks Version (IMPORTANT):**
+   To prevent unexpected deployment failures from Nixpacks updates, **pin the version**:
+   - Go to your Railway service → Variables tab
+   - Add a new variable: `NIXPACKS_VERSION` = `1.41.0`
+   - This ensures your build environment stays consistent
+
+4. **Set Environment Variables:**
+   Add all your Firebase and API keys in Railway's Variables tab:
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN`
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_STORAGE_BUCKET`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+   - `VITE_FIREBASE_APP_ID`
+   - `GEMINI_API_KEY` (optional)
+
+5. **Deploy:**
+   Railway will automatically detect your app and deploy it!
 
 ## Project Structure
 
@@ -92,6 +111,8 @@ npm run preview  # Preview production build locally
 
 ## Environment Variables
 
+### Local Development
+
 Create a `.env.local` file with:
 
 ```env
@@ -108,6 +129,16 @@ VITE_FIREBASE_APP_ID=your_app_id
 ```
 
 See [.env.local.example](.env.local.example) for a template.
+
+### Railway Deployment
+
+**Required Variables:**
+- All the Firebase variables listed above (prefixed with `VITE_`)
+- `GEMINI_API_KEY` (optional, for AI features)
+
+**Important: Pin Nixpacks Version**
+- Add `NIXPACKS_VERSION` = `1.41.0` to prevent build environment changes
+- This saves you from waking up to random 404s when Nixpacks updates!
 
 ## Tech Stack
 
