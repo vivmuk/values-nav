@@ -97,6 +97,23 @@ const App: React.FC = () => {
     setView('history');
   };
 
+  const handleDeleteEntry = async (entryId: string) => {
+    if (deleteCode !== 'DELETE') {
+      alert('Please enter DELETE to confirm');
+      return;
+    }
+    await cloudService.deleteEntry(entryId);
+    const updatedHistory = await cloudService.getHistory();
+    setEntries(updatedHistory);
+    if (updatedHistory.length > 0) {
+      setLastEntry(updatedHistory[0]);
+    } else {
+      setLastEntry(null);
+    }
+    setShowDeleteConfirm(null);
+    setDeleteCode('');
+  };
+
   return (
     <div className="min-h-screen bg-[#F9F8F6] text-[#1a1a1a] selection:bg-[#002395] selection:text-white">
       <div className="max-w-7xl mx-auto px-8 py-12">
