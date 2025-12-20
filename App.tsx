@@ -7,63 +7,11 @@ import BullseyeChart from './components/BullseyeChart';
 import HistoryView from './components/HistoryView';
 import { cloudService } from './services/cloudService';
 
-const FirebaseSetupInstructions = ({ onClose }: { onClose: () => void }) => (
-  <motion.div
-    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-    className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm"
-  >
-    <motion.div
-      initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }}
-      className="bg-white rounded-[3rem] p-12 max-w-2xl w-full shadow-2xl space-y-8 max-h-[80vh] overflow-y-auto"
-    >
-      <div className="flex justify-between items-center">
-        <h3 className="serif text-3xl italic">Firebase Setup Required</h3>
-        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-      </div>
-
-      <div className="space-y-6 text-sm leading-relaxed text-gray-600">
-        <p>To persist your values assessments to the cloud, you'll need to set up Firebase Firestore.</p>
-
-        <div className="bg-gradient-to-br from-[#002395]/5 to-[#ED2939]/5 p-8 rounded-2xl border border-gray-100 space-y-4">
-          <h4 className="font-bold text-lg text-black">📚 Complete Setup Guide Available</h4>
-          <p>We've prepared a comprehensive step-by-step guide that covers:</p>
-          <ul className="list-disc pl-5 space-y-2">
-            <li>Creating a Firebase project</li>
-            <li>Enabling Cloud Firestore database</li>
-            <li>Getting your Firebase configuration</li>
-            <li>Setting up environment variables</li>
-            <li>Testing your connection</li>
-          </ul>
-        </div>
-
-        <div className="bg-gray-50 p-6 rounded-2xl font-mono text-[11px] border border-gray-100">
-          <p className="font-bold mb-2 text-black">📖 Read the setup guide:</p>
-          <code className="text-[#002395]">FIREBASE_SETUP.md</code>
-          <p className="mt-4 font-normal text-gray-500">Located in your project root directory</p>
-        </div>
-
-        <div className="bg-gray-50 p-6 rounded-2xl font-mono text-[11px] border border-gray-100">
-          <p className="font-bold mb-2 text-black">🚂 Ready to deploy to Railway?</p>
-          <code className="text-[#002395]">RAILWAY_DEPLOYMENT.md</code>
-          <p className="mt-4 font-normal text-gray-500">Complete guide for deploying your app</p>
-        </div>
-
-        <p className="text-xs italic text-gray-400">💡 Tip: Set up environment variables using the .env.local.example file as a template</p>
-      </div>
-
-      <button onClick={onClose} className="w-full py-4 bg-black text-white rounded-full text-xs uppercase tracking-widest font-bold hover:bg-[#002395] transition-colors">Got It</button>
-    </motion.div>
-  </motion.div>
-);
-
 const App: React.FC = () => {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [view, setView] = useState<'landing' | 'assess' | 'history'>('landing');
   const [valuePoints, setValuePoints] = useState<ValuePoint[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [showFirebaseHelp, setShowFirebaseHelp] = useState(false);
   const [customInputs, setCustomInputs] = useState<Record<Domain, string>>({
     [Domain.WORK_EDUCATION]: '',
     [Domain.RELATIONSHIPS]: '',
@@ -128,7 +76,6 @@ const App: React.FC = () => {
           <div className="flex gap-12 text-[10px] uppercase tracking-[0.4em] font-semibold text-gray-400">
             <button onClick={() => setView('assess')} className={`transition-colors ${view === 'assess' ? 'text-black border-b border-black' : 'hover:text-black'}`}>The Compass</button>
             <button onClick={() => setView('history')} className={`transition-colors ${view === 'history' ? 'text-black border-b border-black' : 'hover:text-black'}`}>The Timeline</button>
-            <button onClick={() => setShowFirebaseHelp(true)} className="hover:text-[#002395] transition-colors border-l border-gray-200 pl-12">Connect Firebase</button>
           </div>
         </nav>
 
@@ -317,10 +264,6 @@ const App: React.FC = () => {
               </section>
             </motion.div>
           )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {showFirebaseHelp && <FirebaseSetupInstructions onClose={() => setShowFirebaseHelp(false)} />}
         </AnimatePresence>
 
         <footer className="mt-60 pt-16 border-t border-gray-100 flex flex-col items-center gap-12">
