@@ -5,6 +5,7 @@ import { Domain, ValuePoint, Entry } from './types';
 import { DOMAIN_METADATA, PREDEFINED_VALUES } from './constants';
 import BullseyeChart from './components/BullseyeChart';
 import HistoryView from './components/HistoryView';
+import LastSessionSummary from './components/LastSessionSummary';
 import { cloudService } from './services/cloudService';
 
 const App: React.FC = () => {
@@ -12,6 +13,9 @@ const App: React.FC = () => {
   const [view, setView] = useState<'landing' | 'assess' | 'history'>('landing');
   const [valuePoints, setValuePoints] = useState<ValuePoint[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastEntry, setLastEntry] = useState<Entry | null>(null);
+  const [deleteCode, setDeleteCode] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [customInputs, setCustomInputs] = useState<Record<Domain, string>>({
     [Domain.WORK_EDUCATION]: '',
     [Domain.RELATIONSHIPS]: '',
@@ -23,9 +27,20 @@ const App: React.FC = () => {
     const init = async () => {
       const history = await cloudService.getHistory();
       setEntries(history);
+      // Set the most recent entry as the last entry
+      if (history.length > 0) {
+        setLastEntry(history[0]);
+      }
     };
     init();
   }, []);
+
+  // Load last entry when switching to assess view
+  useEffect(() => {
+    if (view === 'assess' && entries.length > 0 && !lastEntry) {
+      setLastEntry(entries[0]);
+    }
+  }, [view, entries]);
 
   const toggleValue = (domain: Domain, value: string) => {
     setValuePoints(prev => {
@@ -46,16 +61,34 @@ const App: React.FC = () => {
   };
 
   const handlePositionChange = (id: string, score: number) => {
-    setValuePoints(prev => prev.map(p => p.id === id ? { ...p, score } : p));
+    // Round to integer for cleaner display
+    const roundedScore = Math.round(score);
+    setValuePoints(prev => prev.map(p => p.id === id ? { ...p, score: roundedScore } : p));
+  };
+
+  // Convert score (0-10) to layer (1-5, where 1 = center, 5 = edge)
+  const scoreToLayer = (score: number): number => {
+    const roundedScore = Math.round(score);
+    if (roundedScore >= 9) return 1; // Center (Layer 1)
+    if (roundedScore >= 7) return 2; // Layer 2
+    if (roundedScore >= 5) return 3; // Layer 3
+    if (roundedScore >= 3) return 4; // Layer 4
+    return 5; // Edge (Layer 5)
   };
 
   const saveToCloud = async () => {
     if (valuePoints.length === 0) return;
     setIsSyncing(true);
+    // Convert scores to integers and add layer numbers before saving
+    const valuePointsWithLayers = valuePoints.map(vp => ({
+      ...vp,
+      score: Math.round(vp.score), // Round to integer
+      layer: scoreToLayer(vp.score) // Add layer number (1-5)
+    }));
     const newEntry: Entry = {
       id: Date.now().toString(),
       timestamp: Date.now(),
-      valuePoints: [...valuePoints]
+      valuePoints: valuePointsWithLayers
     };
     await cloudService.syncEntry(newEntry);
     const updatedHistory = await cloudService.getHistory();
@@ -124,8 +157,14 @@ const App: React.FC = () => {
             <motion.div 
               key="assess"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-32 items-start"
+              className="space-y-16"
             >
+              {/* Show Last Session Summary with Collapsible Quadrants */}
+              {lastEntry && (
+                <LastSessionSummary lastEntry={lastEntry} scoreToLayer={scoreToLayer} />
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-32 items-start">
               {/* Left Column: Visual Mapping */}
               <div className="lg:sticky lg:top-12 space-y-12">
                 <div className="bg-white p-16 rounded-[4rem] shadow-[0_40px_100px_-40px_rgba(0,0,0,0.1)] border border-white">
@@ -236,31 +275,150 @@ const App: React.FC = () => {
               </section>
 
               <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                {entries.map(entry => (
-                  <motion.div 
-                    layout
-                    key={entry.id} 
-                    className="bg-white p-12 rounded-[3rem] border border-white shadow-sm hover:shadow-2xl transition-all duration-500 relative overflow-hidden group"
-                  >
-                    <div className="absolute top-0 left-0 w-1 h-full bg-[#002395] opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    <div className="flex justify-between items-center mb-10 border-b border-gray-50 pb-6">
-                       <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-gray-300">
-                         {new Date(entry.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                       </span>
-                    </div>
-                    <div className="space-y-6">
-                       {entry.valuePoints.map(p => (
-                         <div key={p.id} className="space-y-2">
-                           <div className="flex justify-between items-center text-[8px] uppercase tracking-[0.2em] font-bold">
-                             <span className="text-gray-400">{p.domain.split(' ')[0]}</span>
-                             <span className={p.score > 7 ? 'text-[#002395]' : p.score < 4 ? 'text-[#ED2939]' : 'text-gray-900'}>{p.score}/10</span>
-                           </div>
-                           <p className="text-sm italic font-light">"{p.label}"</p>
-                         </div>
-                       ))}
-                    </div>
-                  </motion.div>
-                ))}
+                {entries.length === 0 ? (
+                  <div className="col-span-full flex flex-col items-center justify-center h-64 border-2 border-dashed border-gray-100 rounded-[3rem]">
+                    <p className="text-gray-300 serif text-lg italic">Your journey awaits its first archive.</p>
+                  </div>
+                ) : (
+                  entries.map(entry => {
+                    // Calculate summary statistics
+                    const layerCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                    const domainCounts: Record<Domain, number> = {
+                      [Domain.WORK_EDUCATION]: 0,
+                      [Domain.RELATIONSHIPS]: 0,
+                      [Domain.PERSONAL_GROWTH_HEALTH]: 0,
+                      [Domain.LEISURE]: 0
+                    };
+                    
+                    entry.valuePoints.forEach(p => {
+                      const layer = (p as any).layer || scoreToLayer(p.score);
+                      layerCounts[layer] = (layerCounts[layer] || 0) + 1;
+                      domainCounts[p.domain] = (domainCounts[p.domain] || 0) + 1;
+                    });
+
+                    return (
+                      <motion.div 
+                        layout
+                        key={entry.id} 
+                        className="bg-white p-12 rounded-[3rem] border border-white shadow-sm hover:shadow-2xl transition-all duration-500 relative overflow-hidden group"
+                      >
+                        <div className="absolute top-0 left-0 w-1 h-full bg-[#002395] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        
+                        {/* Header */}
+                        <div className="flex justify-between items-center mb-8 border-b border-gray-50 pb-6">
+                          <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-gray-300">
+                            {new Date(entry.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                          <span className="text-[9px] uppercase tracking-[0.2em] font-bold text-gray-400">
+                            {entry.valuePoints.length} values
+                          </span>
+                        </div>
+
+                        {/* Summary by Layer */}
+                        <div className="mb-8 space-y-3">
+                          <h4 className="text-[9px] uppercase tracking-[0.3em] font-bold text-gray-400 mb-4">Bullseye Summary</h4>
+                          <div className="grid grid-cols-5 gap-2">
+                            {[1, 2, 3, 4, 5].map(layer => (
+                              <div key={layer} className="text-center">
+                                <div className={`text-lg font-bold ${layer === 1 ? 'text-[#002395]' : layer === 5 ? 'text-[#ED2939]' : 'text-gray-600'}`}>
+                                  {layerCounts[layer] || 0}
+                                </div>
+                                <div className="text-[8px] uppercase tracking-[0.1em] text-gray-400 mt-1">
+                                  L{layer}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex justify-between text-[8px] text-gray-400 mt-4 pt-4 border-t border-gray-50">
+                            <span>Center</span>
+                            <span>Edge</span>
+                          </div>
+                        </div>
+
+                        {/* Domain Breakdown */}
+                        <div className="mb-8 space-y-2">
+                          <h4 className="text-[9px] uppercase tracking-[0.3em] font-bold text-gray-400 mb-3">By Domain</h4>
+                          {(Object.keys(Domain) as (keyof typeof Domain)[]).map(key => {
+                            const domain = Domain[key];
+                            const count = domainCounts[domain];
+                            if (count === 0) return null;
+                            return (
+                              <div key={domain} className="flex justify-between items-center text-xs">
+                                <span className="text-gray-600">{domain.split(' ')[0]}</span>
+                                <span className="font-bold text-gray-900">{count}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Value Points List */}
+                        <div className="space-y-4 pt-6 border-t border-gray-50">
+                          <h4 className="text-[9px] uppercase tracking-[0.3em] font-bold text-gray-400 mb-3">Values</h4>
+                          <div className="space-y-3 max-h-48 overflow-y-auto">
+                            {entry.valuePoints.map(p => {
+                              const layer = (p as any).layer || scoreToLayer(p.score);
+                              const score = Math.round(p.score);
+                              return (
+                                <div key={p.id} className="space-y-1">
+                                  <div className="flex justify-between items-center text-[9px] uppercase tracking-[0.15em] font-semibold">
+                                    <span className="text-gray-400">{p.domain.split(' ')[0]}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`px-2 py-0.5 rounded ${layer === 1 ? 'bg-[#002395]/10 text-[#002395]' : layer === 5 ? 'bg-[#ED2939]/10 text-[#ED2939]' : 'bg-gray-100 text-gray-600'}`}>
+                                        Layer {layer}
+                                      </span>
+                                      <span className="text-gray-600">{score}/10</span>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs italic font-light text-gray-700">"{p.label}"</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Delete Button */}
+                        <div className="pt-6 border-t border-gray-50 mt-6">
+                          {showDeleteConfirm === entry.id ? (
+                            <div className="space-y-3">
+                              <input
+                                type="text"
+                                value={deleteCode}
+                                onChange={(e) => setDeleteCode(e.target.value)}
+                                placeholder="Enter code to delete"
+                                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-xs focus:outline-none focus:border-[#ED2939]"
+                                autoFocus
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleDeleteEntry(entry.id)}
+                                  className="flex-1 py-2 bg-[#ED2939] text-white rounded-lg text-xs uppercase tracking-widest font-bold hover:bg-[#ED2939]/80 transition-colors"
+                                >
+                                  Confirm Delete
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setShowDeleteConfirm(null);
+                                    setDeleteCode('');
+                                  }}
+                                  className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs uppercase tracking-widest font-bold hover:bg-gray-200 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setShowDeleteConfirm(entry.id)}
+                              className="w-full py-2 bg-gray-50 text-gray-500 rounded-lg text-xs uppercase tracking-widest font-bold hover:bg-[#ED2939]/10 hover:text-[#ED2939] transition-colors"
+                            >
+                              Delete Entry
+                            </button>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })
+                )}
               </section>
             </motion.div>
           )}

@@ -41,7 +41,8 @@ const BullseyeChart: React.FC<BullseyeChartProps> = ({ valuePoints, onPositionCh
     const scale = radius / (rect.width / 2 - 40);
     const normalizedDistance = distance * scale;
     const score = Math.max(0, Math.min(10, 10 - (normalizedDistance / radius) * 10));
-    onPositionChange(id, Math.round(score * 10) / 10);
+    // Round to integer for cleaner layer calculation
+    onPositionChange(id, Math.round(score));
   };
 
   return (

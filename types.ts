@@ -10,7 +10,8 @@ export interface ValuePoint {
   id: string;
   label: string;
   domain: Domain;
-  score: number; // 0 to 10
+  score: number; // 0 to 10 (stored as integer)
+  layer?: number; // 1 to 5 (1 = center, 5 = edge)
 }
 
 export interface Entry {

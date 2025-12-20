@@ -1,6 +1,6 @@
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "firebase/firestore";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, doc, deleteDoc } from "firebase/firestore";
 import { Entry } from '../types';
 
 // Your web app's Firebase configuration
@@ -45,6 +45,18 @@ export const cloudService = {
       await addDoc(collection(db, COLLECTION_NAME), entry);
     } catch (error) {
       console.error("Error syncing to Firestore:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Deletes a specific entry by its ID.
+   */
+  async deleteEntry(entryId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, COLLECTION_NAME, entryId));
+    } catch (error) {
+      console.error("Error deleting entry from Firestore:", error);
       throw error;
     }
   },
