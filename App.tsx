@@ -6,11 +6,12 @@ import { DOMAIN_METADATA, PREDEFINED_VALUES } from './constants';
 import BullseyeChart from './components/BullseyeChart';
 import HistoryView from './components/HistoryView';
 import LastSessionSummary from './components/LastSessionSummary';
+import Playbook from './components/Playbook';
 import { cloudService } from './services/cloudService';
 
 const App: React.FC = () => {
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [view, setView] = useState<'landing' | 'assess' | 'history'>('landing');
+  const [view, setView] = useState<'landing' | 'assess' | 'history' | 'playbook'>('landing');
   const [valuePoints, setValuePoints] = useState<ValuePoint[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastEntry, setLastEntry] = useState<Entry | null>(null);
@@ -129,6 +130,7 @@ const App: React.FC = () => {
           <div className="flex gap-12 text-[10px] uppercase tracking-[0.4em] font-semibold text-gray-400">
             <button onClick={() => setView('assess')} className={`transition-colors ${view === 'assess' ? 'text-black border-b border-black' : 'hover:text-black'}`}>The Compass</button>
             <button onClick={() => setView('history')} className={`transition-colors ${view === 'history' ? 'text-black border-b border-black' : 'hover:text-black'}`}>The Timeline</button>
+            <button onClick={() => setView('playbook')} className={`transition-colors ${view === 'playbook' ? 'text-black border-b border-black' : 'hover:text-black'}`}>The Playbook</button>
           </div>
         </nav>
 
@@ -518,6 +520,10 @@ const App: React.FC = () => {
                 )}
               </section>
             </motion.div>
+          )}
+
+          {view === 'playbook' && (
+            <Playbook />
           )}
         </AnimatePresence>
 
